@@ -100,6 +100,12 @@ export default function Home() {
           <span className="truncate">{user.email ?? "알 수 없는 사용자"}</span>
           <div className="flex items-center gap-2">
             <Link
+              href="/onboarding/influencer"
+              className="rounded-md border border-slate-600 px-3 py-1 transition hover:border-slate-400 hover:bg-slate-800"
+            >
+              채널 관리
+            </Link>
+            <Link
               href="/dashboard"
               className="rounded-md border border-slate-600 px-3 py-1 transition hover:border-slate-400 hover:bg-slate-800"
             >
