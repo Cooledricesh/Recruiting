@@ -1,17 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
-
-const defaultFormState = {
-  email: "",
-  password: "",
-  confirmPassword: "",
-};
+import { SignupForm } from "@/features/auth/components/signup/SignupForm";
 
 type SignupPageProps = {
   params: Promise<Record<string, never>>;
@@ -21,171 +14,83 @@ export default function SignupPage({ params }: SignupPageProps) {
   void params;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, refresh } = useCurrentUser();
-  const [formState, setFormState] = useState(defaultFormState);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const { isAuthenticated } = useCurrentUser();
 
   useEffect(() => {
     if (isAuthenticated) {
-      const redirectedFrom = searchParams.get("redirectedFrom") ?? "/";
+      const redirectedFrom = searchParams.get("redirectedFrom") ?? "/dashboard";
       router.replace(redirectedFrom);
     }
   }, [isAuthenticated, router, searchParams]);
-
-  const isSubmitDisabled = useMemo(
-    () =>
-      !formState.email.trim() ||
-      !formState.password.trim() ||
-      formState.password !== formState.confirmPassword,
-    [formState.confirmPassword, formState.email, formState.password]
-  );
-
-  const handleChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const { name, value } = event.target;
-      setFormState((previous) => ({ ...previous, [name]: value }));
-    },
-    []
-  );
-
-  const handleSubmit = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      setIsSubmitting(true);
-      setErrorMessage(null);
-      setInfoMessage(null);
-
-      if (formState.password !== formState.confirmPassword) {
-        setErrorMessage("비밀번호가 일치하지 않습니다.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      const supabase = getSupabaseBrowserClient();
-
-      try {
-        const result = await supabase.auth.signUp({
-          email: formState.email,
-          password: formState.password,
-        });
-
-        if (result.error) {
-          setErrorMessage(result.error.message ?? "회원가입에 실패했습니다.");
-          setIsSubmitting(false);
-          return;
-        }
-
-        await refresh();
-
-        const redirectedFrom = searchParams.get("redirectedFrom") ?? "/";
-
-        if (result.data.session) {
-          router.replace(redirectedFrom);
-          return;
-        }
-
-        setInfoMessage(
-          "확인 이메일을 보냈습니다. 이메일 인증 후 로그인해 주세요."
-        );
-        router.prefetch("/login");
-        setFormState(defaultFormState);
-      } catch (error) {
-        setErrorMessage("회원가입 처리 중 문제가 발생했습니다.");
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [formState.confirmPassword, formState.email, formState.password, refresh, router, searchParams]
-  );
 
   if (isAuthenticated) {
     return null;
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-4xl flex-col items-center justify-center gap-10 px-6 py-16">
+    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center gap-10 px-6 py-16">
       <header className="flex flex-col items-center gap-3 text-center">
         <h1 className="text-3xl font-semibold">회원가입</h1>
         <p className="text-slate-500">
-          Supabase 계정으로 회원가입하고 프로젝트를 시작하세요.
+          체험단 플랫폼에 가입하고 새로운 기회를 만나보세요
         </p>
       </header>
-      <div className="grid w-full gap-8 md:grid-cols-2">
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-4 rounded-xl border border-slate-200 p-6 shadow-sm"
-        >
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            이메일
-            <input
-              type="email"
-              name="email"
-              autoComplete="email"
-              required
-              value={formState.email}
-              onChange={handleChange}
-              className="rounded-md border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
+
+      <div className="grid w-full gap-8 lg:grid-cols-2">
+        <div className="order-2 lg:order-1">
+          <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+            <SignupForm />
+          </div>
+        </div>
+
+        <div className="order-1 flex flex-col justify-center gap-6 lg:order-2">
+          <figure className="overflow-hidden rounded-xl border border-slate-200">
+            <Image
+              src="https://picsum.photos/seed/signup/640/480"
+              alt="회원가입"
+              width={640}
+              height={480}
+              className="h-full w-full object-cover"
+              priority
             />
-          </label>
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            비밀번호
-            <input
-              type="password"
-              name="password"
-              autoComplete="new-password"
-              required
-              value={formState.password}
-              onChange={handleChange}
-              className="rounded-md border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            비밀번호 확인
-            <input
-              type="password"
-              name="confirmPassword"
-              autoComplete="new-password"
-              required
-              value={formState.confirmPassword}
-              onChange={handleChange}
-              className="rounded-md border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
-            />
-          </label>
-          {errorMessage ? (
-            <p className="text-sm text-rose-500">{errorMessage}</p>
-          ) : null}
-          {infoMessage ? (
-            <p className="text-sm text-emerald-600">{infoMessage}</p>
-          ) : null}
-          <button
-            type="submit"
-            disabled={isSubmitting || isSubmitDisabled}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-          >
-            {isSubmitting ? "등록 중" : "회원가입"}
-          </button>
-          <p className="text-xs text-slate-500">
-            이미 계정이 있으신가요?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-slate-700 underline hover:text-slate-900"
-            >
-              로그인으로 이동
-            </Link>
-          </p>
-        </form>
-        <figure className="overflow-hidden rounded-xl border border-slate-200">
-          <Image
-            src="https://picsum.photos/seed/signup/640/640"
-            alt="회원가입"
-            width={640}
-            height={640}
-            className="h-full w-full object-cover"
-            priority
-          />
-        </figure>
+          </figure>
+
+          <div className="space-y-4 rounded-xl bg-slate-50 p-6">
+            <h2 className="text-lg font-semibold text-slate-900">
+              회원가입 혜택
+            </h2>
+            <ul className="space-y-3 text-sm text-slate-600">
+              <li className="flex items-start">
+                <svg className="mr-2 mt-0.5 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>
+                  <strong className="font-medium text-slate-900">광고주</strong>는 효과적인 체험단 운영 도구를 무료로 이용할 수 있습니다
+                </span>
+              </li>
+              <li className="flex items-start">
+                <svg className="mr-2 mt-0.5 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>
+                  <strong className="font-medium text-slate-900">인플루언서</strong>는 다양한 체험단 기회를 쉽게 찾을 수 있습니다
+                </span>
+              </li>
+              <li className="flex items-start">
+                <svg className="mr-2 mt-0.5 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>안전한 거래와 투명한 선정 프로세스</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="mr-2 mt-0.5 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>실시간 알림과 편리한 관리 도구</span>
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
