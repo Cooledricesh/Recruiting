@@ -1,34 +1,23 @@
 "use client";
 
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCurrentUser } from '@/features/auth/hooks/useCurrentUser';
+import { useEffect } from 'react';
 import { AdvertiserProfileForm } from '@/features/advertiser/components/AdvertiserProfileForm';
 import { useAdvertiserProfile } from '@/features/advertiser/hooks/useAdvertiserProfile';
+import { useCurrentUser } from '@/features/auth/hooks/useCurrentUser';
 
-type AdvertiserOnboardingPageProps = {
-  params: Promise<Record<string, never>>;
-};
-
-export default function AdvertiserOnboardingPage({ params }: AdvertiserOnboardingPageProps) {
-  void params;
+export default function AdvertiserProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, user } = useCurrentUser();
-  const { profile, isLoading } = useAdvertiserProfile();
+  const { user, isLoading: userLoading } = useCurrentUser();
+  const { profile, isLoading: profileLoading } = useAdvertiserProfile();
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.replace('/login');
+    if (!userLoading && !user) {
+      router.push('/');
     }
-  }, [isAuthenticated, router]);
+  }, [user, userLoading, router]);
 
-  useEffect(() => {
-    if (profile && !isLoading) {
-      router.replace('/');
-    }
-  }, [profile, isLoading, router]);
-
-  if (!isAuthenticated || isLoading) {
+  if (userLoading || profileLoading) {
     return (
       <div className="container mx-auto py-10">
         <div className="max-w-2xl mx-auto">
@@ -44,7 +33,7 @@ export default function AdvertiserOnboardingPage({ params }: AdvertiserOnboardin
         <AdvertiserProfileForm
           initialData={profile}
           onSuccess={() => {
-            router.push('/');
+            router.push('/advertiser/campaigns');
           }}
         />
       </div>

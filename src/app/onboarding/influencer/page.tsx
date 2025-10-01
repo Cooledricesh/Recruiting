@@ -53,16 +53,9 @@ export default function InfluencerOnboardingPage({ params }: InfluencerOnboardin
   useEffect(() => {
     if (hasLoadedFromStorage) return;
 
-    if (profile && profile.channels.length > 0) {
-      // 기존 프로필이 있으면 해당 데이터 사용
-      setChannels(
-        profile.channels.map(ch => ({
-          channelType: ch.channelType!,
-          channelName: ch.channelName!,
-          channelUrl: ch.channelUrl!,
-          followerCount: ch.followerCount!,
-        }))
-      );
+    if (profile) {
+      // 기존 프로필이 있으면 channels state는 비워둠 (새로 추가할 채널만 담기 위해)
+      setChannels([]);
       InfluencerFormStorage.clear();
     } else {
       // 프로필이 없으면 임시 저장 데이터 확인
@@ -75,16 +68,16 @@ export default function InfluencerOnboardingPage({ params }: InfluencerOnboardin
     setHasLoadedFromStorage(true);
   }, [profile, hasLoadedFromStorage]);
 
-  // 채널 변경 시 임시 저장
+  // 채널 변경 시 임시 저장 (프로필이 없을 때만)
   useEffect(() => {
-    if (hasLoadedFromStorage && channels.length > 0) {
+    if (hasLoadedFromStorage && channels.length > 0 && !profile) {
       const timeoutId = setTimeout(() => {
         InfluencerFormStorage.save(channels);
       }, 500);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [channels, hasLoadedFromStorage]);
+  }, [channels, hasLoadedFromStorage, profile]);
 
   const handleAddChannel = (channel: ChannelInput) => {
     if (channels.length >= MAX_CHANNELS) {
@@ -135,6 +128,7 @@ export default function InfluencerOnboardingPage({ params }: InfluencerOnboardin
       {
         onSuccess: () => {
           InfluencerFormStorage.clear();
+          setChannels([]); // 새로 추가한 채널 state 초기화
           router.push('/');
         },
       }

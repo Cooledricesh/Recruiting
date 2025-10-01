@@ -1,9 +1,12 @@
 /**
- * 휴대폰번호 유효성 검증 유틸리티
+ * 전화번호 유효성 검증 유틸리티
  */
 
 // 휴대폰번호 정규식 (한국 휴대폰 형식)
 const PHONE_REGEX = /^01[0-9]-?[0-9]{4}-?[0-9]{4}$/;
+
+// 일반 전화번호 정규식 (지역번호 포함)
+const STORE_PHONE_REGEX = /^(0[0-9]{1,2})-?([0-9]{3,4})-?([0-9]{4})$/;
 
 /**
  * 휴대폰번호 유효성 검증
@@ -81,4 +84,57 @@ export function getPhoneValidationMessage(phone: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * 업장 전화번호 유효성 검증
+ */
+export function isValidStorePhone(phone: string): boolean {
+  if (!phone) return false;
+  const cleaned = phone.replace(/-/g, '');
+  return STORE_PHONE_REGEX.test(cleaned);
+}
+
+/**
+ * 업장 전화번호 포맷팅
+ */
+export function formatStorePhone(phone: string): string {
+  const cleaned = phone.replace(/[^0-9]/g, '');
+
+  if (cleaned.length < 3) return cleaned;
+
+  // 서울(02) 번호
+  if (cleaned.startsWith('02')) {
+    if (cleaned.length <= 2) return cleaned;
+    if (cleaned.length <= 5) {
+      return `${cleaned.slice(0, 2)}-${cleaned.slice(2)}`;
+    }
+    if (cleaned.length <= 9) {
+      return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 5)}-${cleaned.slice(5)}`;
+    }
+    return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 6)}-${cleaned.slice(6, 10)}`;
+  }
+
+  // 3자리 지역번호
+  if (cleaned.length <= 3) return cleaned;
+  if (cleaned.length <= 6) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+  }
+  if (cleaned.length <= 10) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7, 11)}`;
+}
+
+/**
+ * 업장 전화번호 입력 핸들러
+ */
+export function handleStorePhoneInput(value: string): string {
+  const cleaned = value.replace(/[^0-9]/g, '');
+
+  // 서울 번호는 최대 10자리, 기타 지역번호는 최대 11자리
+  const maxLength = cleaned.startsWith('02') ? 10 : 11;
+  const truncated = cleaned.slice(0, maxLength);
+
+  return formatStorePhone(truncated);
 }

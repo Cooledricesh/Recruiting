@@ -56,20 +56,48 @@ export default function LoginPage({ params }: LoginPageProps) {
         if (nextAction === "success") {
           await refresh();
 
-          // 프로필 정보 확인하여 온보딩 필요 여부 체크
-          try {
-            const { data } = await apiClient.get('/api/influencer/profile');
+          // 사용자 정보 재조회
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          const userRole = currentUser?.user_metadata?.role as string | undefined;
 
-            // 인플루언서이고 프로필이 없거나 채널이 없으면 온보딩으로
-            if (!data || !data.channels || data.channels.length === 0) {
-              router.replace('/onboarding/influencer');
-              return;
+          // 역할별로 프로필 확인 및 온보딩 리다이렉션
+          if (userRole === "influencer") {
+            try {
+              const { data } = await apiClient.get('/influencer/profile');
+
+              // 인플루언서이고 프로필이 없거나 채널이 없으면 온보딩으로
+              if (!data || !data.channels || data.channels.length === 0) {
+                router.replace('/onboarding/influencer');
+                return;
+              }
+            } catch (error: unknown) {
+              // 404는 프로필이 없는 경우 - 온보딩 필요
+              if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as { response?: { status?: number } };
+                if (axiosError.response?.status === 404) {
+                  router.replace('/onboarding/influencer');
+                  return;
+                }
+              }
             }
-          } catch (error: any) {
-            // 404는 프로필이 없는 경우 - 온보딩 필요
-            if (error.response?.status === 404) {
-              router.replace('/onboarding/influencer');
-              return;
+          } else if (userRole === "advertiser") {
+            try {
+              const { data } = await apiClient.get('/advertiser/profile');
+
+              // 광고주이고 프로필이 없으면 온보딩으로
+              if (!data) {
+                router.replace('/onboarding/advertiser');
+                return;
+              }
+            } catch (error: unknown) {
+              // 404는 프로필이 없는 경우 - 온보딩 필요
+              if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as { response?: { status?: number } };
+                if (axiosError.response?.status === 404) {
+                  router.replace('/onboarding/advertiser');
+                  return;
+                }
+              }
             }
           }
 
