@@ -175,7 +175,7 @@ export async function createOrUpdateProfile(
           category: data.category,
           business_number: data.businessNumber,
           representative_name: data.representativeName,
-          is_verified: false,
+          is_verified: true,
         })
         .select()
         .single();
@@ -200,7 +200,7 @@ export async function createOrUpdateProfile(
           category: data.category,
           business_number: data.businessNumber,
           representative_name: data.representativeName,
-          is_verified: false,
+          is_verified: true,
         })
         .eq('user_id', userId)
         .select()

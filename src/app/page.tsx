@@ -71,12 +71,20 @@ export default function Home() {
               </>
             )}
             {userRole === "advertiser" && (
-              <Link
-                href="/advertiser/profile"
-                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-              >
-                광고주 정보 관리
-              </Link>
+              <>
+                <Link
+                  href="/advertiser/campaigns"
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1 text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  체험단 관리
+                </Link>
+                <Link
+                  href="/advertiser/profile"
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1 text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  광고주 정보 관리
+                </Link>
+              </>
             )}
             <button
               type="button"

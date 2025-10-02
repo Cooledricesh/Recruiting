@@ -8,6 +8,9 @@ export {
   CampaignSortSchema,
   ApplicationRequestSchema,
   ApplicationResponseSchema,
+  CreateCampaignRequestSchema,
+  AdvertiserCampaignResponseSchema,
+  AdvertiserCampaignListResponseSchema,
 } from '@/features/campaign/backend/schema';
 
 export type {
@@ -18,4 +21,7 @@ export type {
   Pagination,
   ApplicationRequest,
   ApplicationResponse,
+  CreateCampaignRequest,
+  AdvertiserCampaignResponse,
+  AdvertiserCampaignListResponse,
 } from '@/features/campaign/backend/schema';

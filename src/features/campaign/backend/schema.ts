@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isFutureDate } from '@/lib/validation-utils';
+import { isFutureDate, isAfterDate } from '@/lib/validation-utils';
 
 export const CampaignStatusSchema = z.enum(['recruiting', 'closed', 'selected']);
 export const CampaignSortSchema = z.enum(['latest', 'deadline']);
@@ -149,3 +149,38 @@ export const ApplicationResponseSchema = z.object({
 });
 
 export type ApplicationResponse = z.infer<typeof ApplicationResponseSchema>;
+
+// 체험단 생성 요청 스키마
+export const CreateCampaignRequestSchema = z.object({
+  title: z.string().min(5, '제목은 최소 5자 이상이어야 합니다').max(100, '제목은 최대 100자까지 입력 가능합니다'),
+  recruitmentStart: z.string().refine(isFutureDate, {
+    message: '모집 시작일은 오늘 이후여야 합니다',
+  }),
+  recruitmentEnd: z.string(),
+  recruitmentCount: z.coerce.number().int().positive('모집 인원은 1명 이상이어야 합니다'),
+  benefits: z.string().min(10, '제공 혜택은 최소 10자 이상이어야 합니다'),
+  mission: z.string().min(10, '미션 내용은 최소 10자 이상이어야 합니다'),
+  storeInfo: z.string().min(5, '매장 정보는 최소 5자 이상이어야 합니다'),
+}).refine(
+  (data) => isAfterDate(data.recruitmentEnd, data.recruitmentStart),
+  {
+    message: '모집 종료일은 시작일 이후여야 합니다',
+    path: ['recruitmentEnd'],
+  }
+);
+
+export type CreateCampaignRequest = z.infer<typeof CreateCampaignRequestSchema>;
+
+// 광고주 체험단 목록 응답
+export const AdvertiserCampaignResponseSchema = CampaignResponseSchema.extend({
+  applicantCount: z.number().int().nonnegative().optional().default(0),
+});
+
+export type AdvertiserCampaignResponse = z.infer<typeof AdvertiserCampaignResponseSchema>;
+
+export const AdvertiserCampaignListResponseSchema = z.object({
+  campaigns: z.array(AdvertiserCampaignResponseSchema),
+  pagination: PaginationSchema,
+});
+
+export type AdvertiserCampaignListResponse = z.infer<typeof AdvertiserCampaignListResponseSchema>;

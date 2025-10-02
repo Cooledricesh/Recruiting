@@ -17,6 +17,9 @@ import {
   CampaignDetailTableRowSchema,
   CampaignDetailResponseSchema,
   ApplicationResponseSchema,
+  CreateCampaignRequestSchema,
+  AdvertiserCampaignResponseSchema,
+  AdvertiserCampaignListResponseSchema,
   type CampaignListQuery,
   type CampaignListResponse,
   type CampaignResponse,
@@ -25,6 +28,9 @@ import {
   type CampaignDetailResponse,
   type ApplicationRequest,
   type ApplicationResponse,
+  type CreateCampaignRequest,
+  type AdvertiserCampaignResponse,
+  type AdvertiserCampaignListResponse,
 } from './schema';
 import {
   campaignErrorCodes,
@@ -432,4 +438,274 @@ export const createApplication = async (
   }
 
   return success(responseParse.data, 201);
+};
+
+export const getAdvertiserCampaigns = async (
+  client: SupabaseClient,
+  userId: string,
+  filters: Pick<CampaignListQuery, 'status' | 'sort' | 'page' | 'limit'>
+): Promise<
+  HandlerResult<AdvertiserCampaignListResponse, CampaignServiceError, unknown>
+> => {
+  const { status, sort, page, limit } = filters;
+
+  const { data: advertiserProfile, error: profileError } = await client
+    .from('advertiser_profiles')
+    .select('id, is_verified')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !advertiserProfile) {
+    return failure(
+      404,
+      campaignErrorCodes.advertiserNotFound,
+      '광고주 프로필을 찾을 수 없습니다'
+    );
+  }
+
+  if (!advertiserProfile.is_verified) {
+    return failure(
+      403,
+      campaignErrorCodes.advertiserNotVerified,
+      '인증된 광고주만 접근 가능합니다'
+    );
+  }
+
+  const offset = calculateOffset(page, limit);
+
+  let query = client
+    .from(CAMPAIGNS_TABLE)
+    .select(
+      `
+      id,
+      title,
+      recruitment_start,
+      recruitment_end,
+      recruitment_count,
+      benefits,
+      status,
+      created_at,
+      advertiser_profiles!inner(
+        company_name,
+        location,
+        category
+      )
+    `,
+      { count: 'exact' }
+    )
+    .eq('advertiser_id', advertiserProfile.id)
+    .eq('status', status);
+
+  if (sort === 'latest') {
+    query = query.order('created_at', { ascending: false });
+  } else if (sort === 'deadline') {
+    query = query.order('recruitment_end', { ascending: true });
+  }
+
+  query = query.range(offset, offset + limit - 1);
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    return failure(500, campaignErrorCodes.fetchError, error.message);
+  }
+
+  if (!data) {
+    return failure(
+      404,
+      campaignErrorCodes.fetchError,
+      'No campaigns found'
+    );
+  }
+
+  const mappedCampaigns: AdvertiserCampaignResponse[] = [];
+
+  for (const row of data) {
+    const rowParse = CampaignTableRowSchema.safeParse(row);
+
+    if (!rowParse.success) {
+      return failure(
+        500,
+        campaignErrorCodes.validationError,
+        'Campaign row failed validation',
+        rowParse.error.format()
+      );
+    }
+
+    const validRow: CampaignTableRow = rowParse.data;
+
+    const { count: applicantCount } = await client
+      .from('applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('campaign_id', validRow.id);
+
+    const daysRemaining = calculateDaysRemaining(
+      validRow.recruitment_end
+    );
+
+    const mapped: AdvertiserCampaignResponse = {
+      id: validRow.id,
+      title: validRow.title,
+      recruitmentStart: validRow.recruitment_start,
+      recruitmentEnd: validRow.recruitment_end,
+      recruitmentCount: validRow.recruitment_count,
+      benefits: validRow.benefits,
+      status: validRow.status as 'recruiting' | 'closed' | 'selected',
+      category: validRow.advertiser_profiles.category,
+      companyName: validRow.advertiser_profiles.company_name,
+      location: validRow.advertiser_profiles.location,
+      createdAt: validRow.created_at,
+      daysRemaining,
+      isDeadlineSoon: isDeadlineSoon(validRow.recruitment_end),
+      applicantCount: applicantCount ?? 0,
+    };
+
+    const campaignParse = AdvertiserCampaignResponseSchema.safeParse(mapped);
+
+    if (!campaignParse.success) {
+      return failure(
+        500,
+        campaignErrorCodes.validationError,
+        'Campaign response failed validation',
+        campaignParse.error.format()
+      );
+    }
+
+    mappedCampaigns.push(campaignParse.data);
+  }
+
+  const pagination = calculatePagination(page, limit, count ?? 0);
+
+  const response: AdvertiserCampaignListResponse = {
+    campaigns: mappedCampaigns,
+    pagination,
+  };
+
+  const responseParse = AdvertiserCampaignListResponseSchema.safeParse(response);
+
+  if (!responseParse.success) {
+    return failure(
+      500,
+      campaignErrorCodes.validationError,
+      'Campaign list response failed validation',
+      responseParse.error.format()
+    );
+  }
+
+  return success(responseParse.data);
+};
+
+export const createCampaign = async (
+  client: SupabaseClient,
+  userId: string,
+  request: CreateCampaignRequest
+): Promise<
+  HandlerResult<CampaignResponse, CampaignServiceError, unknown>
+> => {
+  const { data: advertiserProfile, error: profileError } = await client
+    .from('advertiser_profiles')
+    .select('id, is_verified, company_name, location, category')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !advertiserProfile) {
+    return failure(
+      404,
+      campaignErrorCodes.advertiserNotFound,
+      '광고주 프로필을 찾을 수 없습니다'
+    );
+  }
+
+  if (!advertiserProfile.is_verified) {
+    return failure(
+      403,
+      campaignErrorCodes.advertiserNotVerified,
+      '인증된 광고주만 체험단을 등록할 수 있습니다'
+    );
+  }
+
+  const requestParse = CreateCampaignRequestSchema.safeParse(request);
+
+  if (!requestParse.success) {
+    return failure(
+      400,
+      campaignErrorCodes.validationError,
+      'Invalid campaign data',
+      requestParse.error.format()
+    );
+  }
+
+  const validRequest = requestParse.data;
+
+  if (!isFutureDate(validRequest.recruitmentStart)) {
+    return failure(
+      400,
+      campaignErrorCodes.invalidDateRange,
+      '모집 시작일은 오늘 이후여야 합니다'
+    );
+  }
+
+  if (!isAfterDate(validRequest.recruitmentEnd, validRequest.recruitmentStart)) {
+    return failure(
+      400,
+      campaignErrorCodes.invalidDateRange,
+      '모집 종료일은 시작일 이후여야 합니다'
+    );
+  }
+
+  const { data: newCampaign, error: insertError } = await client
+    .from(CAMPAIGNS_TABLE)
+    .insert({
+      advertiser_id: advertiserProfile.id,
+      title: validRequest.title,
+      recruitment_start: validRequest.recruitmentStart,
+      recruitment_end: validRequest.recruitmentEnd,
+      recruitment_count: validRequest.recruitmentCount,
+      benefits: validRequest.benefits,
+      mission: validRequest.mission,
+      store_info: validRequest.storeInfo,
+      status: 'recruiting',
+    })
+    .select('id, title, recruitment_start, recruitment_end, recruitment_count, benefits, status, created_at')
+    .single();
+
+  if (insertError || !newCampaign) {
+    return failure(
+      500,
+      campaignErrorCodes.createFailed,
+      '체험단 생성에 실패했습니다',
+      insertError
+    );
+  }
+
+  const daysRemaining = calculateDaysRemaining(newCampaign.recruitment_end);
+
+  const response: CampaignResponse = {
+    id: newCampaign.id,
+    title: newCampaign.title,
+    recruitmentStart: newCampaign.recruitment_start,
+    recruitmentEnd: newCampaign.recruitment_end,
+    recruitmentCount: newCampaign.recruitment_count,
+    benefits: newCampaign.benefits,
+    status: newCampaign.status as 'recruiting' | 'closed' | 'selected',
+    category: advertiserProfile.category,
+    companyName: advertiserProfile.company_name,
+    location: advertiserProfile.location,
+    createdAt: newCampaign.created_at,
+    daysRemaining,
+    isDeadlineSoon: isDeadlineSoon(newCampaign.recruitment_end),
+  };
+
+  const campaignParse = CampaignResponseSchema.safeParse(response);
+
+  if (!campaignParse.success) {
+    return failure(
+      500,
+      campaignErrorCodes.validationError,
+      'Campaign response failed validation',
+      campaignParse.error.format()
+    );
+  }
+
+  return success(campaignParse.data, 201);
 };
