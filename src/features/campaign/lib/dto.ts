@@ -11,6 +11,12 @@ export {
   CreateCampaignRequestSchema,
   AdvertiserCampaignResponseSchema,
   AdvertiserCampaignListResponseSchema,
+  ApplicantResponseSchema,
+  AdvertiserCampaignDetailResponseSchema,
+  SelectApplicantsRequestSchema,
+  SelectApplicantsResponseSchema,
+  CloseCampaignResponseSchema,
+  ApplicationStatusSchema,
 } from '@/features/campaign/backend/schema';
 
 export type {
@@ -24,4 +30,9 @@ export type {
   CreateCampaignRequest,
   AdvertiserCampaignResponse,
   AdvertiserCampaignListResponse,
+  ApplicantResponse,
+  AdvertiserCampaignDetailResponse,
+  SelectApplicantsRequest,
+  SelectApplicantsResponse,
+  CloseCampaignResponse,
 } from '@/features/campaign/backend/schema';

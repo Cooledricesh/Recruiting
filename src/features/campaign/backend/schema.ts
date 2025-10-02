@@ -184,3 +184,63 @@ export const AdvertiserCampaignListResponseSchema = z.object({
 });
 
 export type AdvertiserCampaignListResponse = z.infer<typeof AdvertiserCampaignListResponseSchema>;
+
+export const ApplicationStatusSchema = z.enum(['applied', 'selected', 'rejected']);
+
+export const ApplicantResponseSchema = z.object({
+  id: z.string().uuid(),
+  influencerId: z.string().uuid(),
+  influencerName: z.string(),
+  message: z.string(),
+  visitDate: z.string(),
+  status: ApplicationStatusSchema,
+  createdAt: z.string(),
+  channels: z.array(z.object({
+    channelType: z.string(),
+    channelName: z.string(),
+    followerCount: z.number().int().nonnegative(),
+  })),
+});
+
+export type ApplicantResponse = z.infer<typeof ApplicantResponseSchema>;
+
+export const AdvertiserCampaignDetailResponseSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  recruitmentStart: z.string(),
+  recruitmentEnd: z.string(),
+  recruitmentCount: z.number().int().positive(),
+  benefits: z.string(),
+  mission: z.string(),
+  storeInfo: z.string(),
+  status: CampaignStatusSchema,
+  category: z.string(),
+  companyName: z.string(),
+  location: z.string(),
+  createdAt: z.string(),
+  daysRemaining: z.number().int().optional(),
+  isDeadlineSoon: z.boolean(),
+  applicants: z.array(ApplicantResponseSchema),
+  applicantCount: z.number().int().nonnegative(),
+});
+
+export type AdvertiserCampaignDetailResponse = z.infer<typeof AdvertiserCampaignDetailResponseSchema>;
+
+export const SelectApplicantsRequestSchema = z.object({
+  selectedIds: z.array(z.string().uuid()).min(1, '최소 1명 이상 선택해야 합니다'),
+});
+
+export type SelectApplicantsRequest = z.infer<typeof SelectApplicantsRequestSchema>;
+
+export const SelectApplicantsResponseSchema = z.object({
+  selectedCount: z.number().int().positive(),
+  rejectedCount: z.number().int().nonnegative(),
+});
+
+export type SelectApplicantsResponse = z.infer<typeof SelectApplicantsResponseSchema>;
+
+export const CloseCampaignResponseSchema = z.object({
+  status: z.literal('closed'),
+});
+
+export type CloseCampaignResponse = z.infer<typeof CloseCampaignResponseSchema>;

@@ -20,6 +20,10 @@ import {
   CreateCampaignRequestSchema,
   AdvertiserCampaignResponseSchema,
   AdvertiserCampaignListResponseSchema,
+  AdvertiserCampaignDetailResponseSchema,
+  SelectApplicantsRequestSchema,
+  SelectApplicantsResponseSchema,
+  CloseCampaignResponseSchema,
   type CampaignListQuery,
   type CampaignListResponse,
   type CampaignResponse,
@@ -31,6 +35,11 @@ import {
   type CreateCampaignRequest,
   type AdvertiserCampaignResponse,
   type AdvertiserCampaignListResponse,
+  type AdvertiserCampaignDetailResponse,
+  type ApplicantResponse,
+  type SelectApplicantsRequest,
+  type SelectApplicantsResponse,
+  type CloseCampaignResponse,
 } from './schema';
 import {
   campaignErrorCodes,
@@ -708,4 +717,394 @@ export const createCampaign = async (
   }
 
   return success(campaignParse.data, 201);
+};
+
+export const getAdvertiserCampaignDetail = async (
+  client: SupabaseClient,
+  userId: string,
+  campaignId: string
+): Promise<
+  HandlerResult<AdvertiserCampaignDetailResponse, CampaignServiceError, unknown>
+> => {
+  const { data: advertiserProfile, error: profileError } = await client
+    .from('advertiser_profiles')
+    .select('id, is_verified')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !advertiserProfile) {
+    return failure(
+      404,
+      campaignErrorCodes.advertiserNotFound,
+      '광고주 프로필을 찾을 수 없습니다'
+    );
+  }
+
+  if (!advertiserProfile.is_verified) {
+    return failure(
+      403,
+      campaignErrorCodes.advertiserNotVerified,
+      '인증된 광고주만 접근 가능합니다'
+    );
+  }
+
+  const { data: campaign, error: campaignError } = await client
+    .from(CAMPAIGNS_TABLE)
+    .select(
+      `
+      id,
+      title,
+      recruitment_start,
+      recruitment_end,
+      recruitment_count,
+      benefits,
+      mission,
+      store_info,
+      status,
+      created_at,
+      advertiser_id,
+      advertiser_profiles!inner(
+        company_name,
+        location,
+        category
+      )
+    `
+    )
+    .eq('id', campaignId)
+    .single();
+
+  if (campaignError || !campaign) {
+    if (campaignError?.code === 'PGRST116') {
+      return failure(404, campaignErrorCodes.notFound, '체험단을 찾을 수 없습니다');
+    }
+    return failure(500, campaignErrorCodes.fetchError, campaignError?.message || '체험단 조회 실패');
+  }
+
+  if (campaign.advertiser_id !== advertiserProfile.id) {
+    return failure(
+      403,
+      campaignErrorCodes.unauthorizedAccess,
+      '해당 체험단에 접근할 권한이 없습니다'
+    );
+  }
+
+  const { data: applications, error: applicationsError } = await client
+    .from('applications')
+    .select(
+      `
+      id,
+      message,
+      visit_date,
+      status,
+      created_at,
+      influencer_profiles!inner(
+        id,
+        user_id,
+        profiles!inner(
+          name
+        )
+      )
+    `
+    )
+    .eq('campaign_id', campaignId);
+
+  if (applicationsError) {
+    return failure(500, campaignErrorCodes.fetchError, applicationsError.message);
+  }
+
+  const applicants: ApplicantResponse[] = [];
+
+  for (const app of applications || []) {
+    const influencerProfile = Array.isArray(app.influencer_profiles)
+      ? app.influencer_profiles[0]
+      : app.influencer_profiles;
+
+    const profile = Array.isArray(influencerProfile.profiles)
+      ? influencerProfile.profiles[0]
+      : influencerProfile.profiles;
+
+    const { data: channels } = await client
+      .from('influencer_channels')
+      .select('channel_type, channel_name, follower_count')
+      .eq('influencer_id', influencerProfile.id);
+
+    applicants.push({
+      id: app.id,
+      influencerId: influencerProfile.id,
+      influencerName: profile.name,
+      message: app.message,
+      visitDate: app.visit_date,
+      status: app.status as 'applied' | 'selected' | 'rejected',
+      createdAt: app.created_at,
+      channels: (channels || []).map((ch) => ({
+        channelType: ch.channel_type,
+        channelName: ch.channel_name,
+        followerCount: ch.follower_count || 0,
+      })),
+    });
+  }
+
+  const daysRemaining = calculateDaysRemaining(campaign.recruitment_end);
+
+  const advertiserProfiles = Array.isArray(campaign.advertiser_profiles)
+    ? campaign.advertiser_profiles[0]
+    : campaign.advertiser_profiles;
+
+  const response: AdvertiserCampaignDetailResponse = {
+    id: campaign.id,
+    title: campaign.title,
+    recruitmentStart: campaign.recruitment_start,
+    recruitmentEnd: campaign.recruitment_end,
+    recruitmentCount: campaign.recruitment_count,
+    benefits: campaign.benefits,
+    mission: campaign.mission,
+    storeInfo: campaign.store_info,
+    status: campaign.status as 'recruiting' | 'closed' | 'selected',
+    category: advertiserProfiles.category,
+    companyName: advertiserProfiles.company_name,
+    location: advertiserProfiles.location,
+    createdAt: campaign.created_at,
+    daysRemaining,
+    isDeadlineSoon: isDeadlineSoon(campaign.recruitment_end),
+    applicants,
+    applicantCount: applicants.length,
+  };
+
+  const responseParse = AdvertiserCampaignDetailResponseSchema.safeParse(response);
+
+  if (!responseParse.success) {
+    return failure(
+      500,
+      campaignErrorCodes.validationError,
+      'Response validation failed',
+      responseParse.error.format()
+    );
+  }
+
+  return success(responseParse.data);
+};
+
+export const closeCampaign = async (
+  client: SupabaseClient,
+  userId: string,
+  campaignId: string
+): Promise<
+  HandlerResult<CloseCampaignResponse, CampaignServiceError, unknown>
+> => {
+  const { data: advertiserProfile, error: profileError } = await client
+    .from('advertiser_profiles')
+    .select('id, is_verified')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !advertiserProfile) {
+    return failure(
+      404,
+      campaignErrorCodes.advertiserNotFound,
+      '광고주 프로필을 찾을 수 없습니다'
+    );
+  }
+
+  if (!advertiserProfile.is_verified) {
+    return failure(
+      403,
+      campaignErrorCodes.advertiserNotVerified,
+      '인증된 광고주만 접근 가능합니다'
+    );
+  }
+
+  const { data: campaign, error: campaignError } = await client
+    .from(CAMPAIGNS_TABLE)
+    .select('id, status, advertiser_id')
+    .eq('id', campaignId)
+    .single();
+
+  if (campaignError || !campaign) {
+    if (campaignError?.code === 'PGRST116') {
+      return failure(404, campaignErrorCodes.notFound, '체험단을 찾을 수 없습니다');
+    }
+    return failure(500, campaignErrorCodes.fetchError, campaignError?.message || '체험단 조회 실패');
+  }
+
+  if (campaign.advertiser_id !== advertiserProfile.id) {
+    return failure(
+      403,
+      campaignErrorCodes.unauthorizedAccess,
+      '해당 체험단에 접근할 권한이 없습니다'
+    );
+  }
+
+  if (campaign.status === 'closed' || campaign.status === 'selected') {
+    return failure(
+      400,
+      campaignErrorCodes.alreadyClosed,
+      '이미 모집이 종료된 체험단입니다'
+    );
+  }
+
+  if (campaign.status !== 'recruiting') {
+    return failure(
+      400,
+      campaignErrorCodes.alreadyClosed,
+      '모집중인 체험단만 종료할 수 있습니다'
+    );
+  }
+
+  const { error: updateError } = await client
+    .from(CAMPAIGNS_TABLE)
+    .update({ status: 'closed' })
+    .eq('id', campaignId);
+
+  if (updateError) {
+    return failure(
+      500,
+      campaignErrorCodes.closeFailed,
+      '모집종료 처리에 실패했습니다',
+      updateError
+    );
+  }
+
+  return success({ status: 'closed' });
+};
+
+export const selectApplicants = async (
+  client: SupabaseClient,
+  userId: string,
+  campaignId: string,
+  request: SelectApplicantsRequest
+): Promise<
+  HandlerResult<SelectApplicantsResponse, CampaignServiceError, unknown>
+> => {
+  const { data: advertiserProfile, error: profileError } = await client
+    .from('advertiser_profiles')
+    .select('id, is_verified')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !advertiserProfile) {
+    return failure(
+      404,
+      campaignErrorCodes.advertiserNotFound,
+      '광고주 프로필을 찾을 수 없습니다'
+    );
+  }
+
+  if (!advertiserProfile.is_verified) {
+    return failure(
+      403,
+      campaignErrorCodes.advertiserNotVerified,
+      '인증된 광고주만 접근 가능합니다'
+    );
+  }
+
+  const { data: campaign, error: campaignError } = await client
+    .from(CAMPAIGNS_TABLE)
+    .select('id, status, advertiser_id')
+    .eq('id', campaignId)
+    .single();
+
+  if (campaignError || !campaign) {
+    if (campaignError?.code === 'PGRST116') {
+      return failure(404, campaignErrorCodes.notFound, '체험단을 찾을 수 없습니다');
+    }
+    return failure(500, campaignErrorCodes.fetchError, campaignError?.message || '체험단 조회 실패');
+  }
+
+  if (campaign.advertiser_id !== advertiserProfile.id) {
+    return failure(
+      403,
+      campaignErrorCodes.unauthorizedAccess,
+      '해당 체험단에 접근할 권한이 없습니다'
+    );
+  }
+
+  if (campaign.status === 'selected') {
+    return failure(
+      400,
+      campaignErrorCodes.alreadySelected,
+      '이미 선정이 완료된 체험단입니다'
+    );
+  }
+
+  if (campaign.status !== 'closed') {
+    return failure(
+      400,
+      campaignErrorCodes.notClosedYet,
+      '모집종료된 체험단만 선정할 수 있습니다'
+    );
+  }
+
+  const { selectedIds } = request;
+
+  const { data: allApplications, error: appError } = await client
+    .from('applications')
+    .select('id')
+    .eq('campaign_id', campaignId);
+
+  if (appError) {
+    return failure(500, campaignErrorCodes.fetchError, appError.message);
+  }
+
+  const allAppIds = (allApplications || []).map((app) => app.id);
+
+  for (const selectedId of selectedIds) {
+    if (!allAppIds.includes(selectedId)) {
+      return failure(
+        400,
+        campaignErrorCodes.invalidSelection,
+        '존재하지 않는 지원 ID가 포함되어 있습니다'
+      );
+    }
+  }
+
+  const { error: campaignUpdateError } = await client
+    .from(CAMPAIGNS_TABLE)
+    .update({ status: 'selected' })
+    .eq('id', campaignId);
+
+  if (campaignUpdateError) {
+    return failure(
+      500,
+      campaignErrorCodes.selectFailed,
+      '선정 처리에 실패했습니다',
+      campaignUpdateError
+    );
+  }
+
+  const { error: selectedUpdateError } = await client
+    .from('applications')
+    .update({ status: 'selected' })
+    .in('id', selectedIds);
+
+  if (selectedUpdateError) {
+    return failure(
+      500,
+      campaignErrorCodes.selectFailed,
+      '선정 상태 업데이트에 실패했습니다',
+      selectedUpdateError
+    );
+  }
+
+  const rejectedIds = allAppIds.filter((id) => !selectedIds.includes(id));
+
+  if (rejectedIds.length > 0) {
+    const { error: rejectedUpdateError } = await client
+      .from('applications')
+      .update({ status: 'rejected' })
+      .in('id', rejectedIds);
+
+    if (rejectedUpdateError) {
+      return failure(
+        500,
+        campaignErrorCodes.selectFailed,
+        '반려 상태 업데이트에 실패했습니다',
+        rejectedUpdateError
+      );
+    }
+  }
+
+  return success({
+    selectedCount: selectedIds.length,
+    rejectedCount: rejectedIds.length,
+  });
 };

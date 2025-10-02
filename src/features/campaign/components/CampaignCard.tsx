@@ -15,9 +15,10 @@ import { BUSINESS_CATEGORIES } from "@/constants/business-categories";
 
 type CampaignCardProps = {
   campaign: CampaignResponse;
+  baseUrl?: string;
 };
 
-export function CampaignCard({ campaign }: CampaignCardProps) {
+export function CampaignCard({ campaign, baseUrl = "/campaigns" }: CampaignCardProps) {
   const categoryLabel =
     BUSINESS_CATEGORIES.find((cat) => cat.value === campaign.category)?.label ??
     campaign.category;
@@ -31,7 +32,7 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
   };
 
   return (
-    <Link href={`/campaigns/${campaign.id}`}>
+    <Link href={`${baseUrl}/${campaign.id}`}>
       <Card className="group cursor-pointer transition-all hover:shadow-lg">
       <div className="relative h-48 w-full overflow-hidden rounded-t-lg bg-slate-100">
         {/* eslint-disable-next-line @next/next/no-img-element */}
