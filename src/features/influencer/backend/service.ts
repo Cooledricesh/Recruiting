@@ -236,6 +236,21 @@ export async function createOrUpdateProfile(
         );
       }
 
+      // 채널이 1개 이상 등록되면 프로필 검증 완료 처리
+      if (insertedChannels.length > 0 && !influencerProfile.is_verified) {
+        const { error: verifyError } = await supabase
+          .from('influencer_profiles')
+          .update({ is_verified: true })
+          .eq('id', influencerProfile.id);
+
+        if (verifyError) {
+          console.warn('Failed to verify influencer profile:', verifyError);
+        } else {
+          // 프로필 검증 상태 업데이트
+          influencerProfile.is_verified = true;
+        }
+      }
+
       const response: ProfileResponse = {
         profileId: influencerProfile.id,
         userId: influencerProfile.user_id,

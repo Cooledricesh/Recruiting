@@ -13,10 +13,14 @@ import {
   CampaignListResponseSchema,
   CampaignResponseSchema,
   CampaignTableRowSchema,
+  CampaignDetailTableRowSchema,
+  CampaignDetailResponseSchema,
   type CampaignListQuery,
   type CampaignListResponse,
   type CampaignResponse,
   type CampaignTableRow,
+  type CampaignDetailTableRow,
+  type CampaignDetailResponse,
 } from './schema';
 import {
   campaignErrorCodes,
@@ -151,4 +155,130 @@ export const getCampaignList = async (
   }
 
   return success(responseParse.data);
+};
+
+export const getCampaignDetail = async (
+  client: SupabaseClient,
+  campaignId: string,
+  userId: string | null
+): Promise<
+  HandlerResult<CampaignDetailResponse, CampaignServiceError, unknown>
+> => {
+  const query = client
+    .from(CAMPAIGNS_TABLE)
+    .select(
+      `
+      id,
+      title,
+      recruitment_start,
+      recruitment_end,
+      recruitment_count,
+      benefits,
+      mission,
+      store_info,
+      status,
+      created_at,
+      advertiser_profiles!inner(
+        id,
+        company_name,
+        location,
+        category,
+        store_phone
+      )
+    `
+    )
+    .eq('id', campaignId)
+    .single();
+
+  const { data, error } = await query;
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return failure(404, campaignErrorCodes.notFound, 'Campaign not found');
+    }
+    return failure(500, campaignErrorCodes.fetchError, error.message);
+  }
+
+  if (!data) {
+    return failure(404, campaignErrorCodes.notFound, 'Campaign not found');
+  }
+
+  const rowParse = CampaignDetailTableRowSchema.safeParse(data);
+
+  if (!rowParse.success) {
+    return failure(
+      500,
+      campaignErrorCodes.validationError,
+      'Campaign detail row failed validation',
+      rowParse.error.format()
+    );
+  }
+
+  const validRow: CampaignDetailTableRow = rowParse.data;
+
+  let hasApplied = false;
+  let hasInfluencerProfile = false;
+
+  if (userId) {
+    const { data: influencerProfile } = await client
+      .from('influencer_profiles')
+      .select('id, is_verified')
+      .eq('user_id', userId)
+      .single();
+
+    if (influencerProfile && influencerProfile.is_verified) {
+      hasInfluencerProfile = true;
+
+      const { data: application } = await client
+        .from('applications')
+        .select('id')
+        .eq('campaign_id', campaignId)
+        .eq('influencer_id', influencerProfile.id)
+        .single();
+
+      hasApplied = !!application;
+    }
+  }
+
+  const daysRemaining = calculateDaysRemaining(validRow.recruitment_end);
+
+  const mapped: CampaignDetailResponse = {
+    id: validRow.id,
+    title: validRow.title,
+    recruitmentStart: validRow.recruitment_start,
+    recruitmentEnd: validRow.recruitment_end,
+    recruitmentCount: validRow.recruitment_count,
+    benefits: validRow.benefits,
+    mission: validRow.mission,
+    storeInfo: validRow.store_info,
+    status: validRow.status as 'recruiting' | 'closed' | 'selected',
+    category: validRow.advertiser_profiles.category,
+    companyName: validRow.advertiser_profiles.company_name,
+    location: validRow.advertiser_profiles.location,
+    createdAt: validRow.created_at,
+    daysRemaining,
+    isDeadlineSoon: isDeadlineSoon(validRow.recruitment_end),
+    hasApplied,
+    hasInfluencerProfile,
+    advertiser: {
+      id: validRow.advertiser_profiles.id,
+      companyName: validRow.advertiser_profiles.company_name,
+      location: validRow.advertiser_profiles.location,
+      category: validRow.advertiser_profiles.category,
+      storePhone: validRow.advertiser_profiles.store_phone,
+    },
+  };
+
+  const detailParse = CampaignDetailResponseSchema.safeParse(mapped);
+
+  if (!detailParse.success) {
+    return failure(
+      500,
+      campaignErrorCodes.validationError,
+      'Campaign detail response failed validation',
+      detailParse.error.format()
+    );
+  }
+
+  return success(detailParse.data);
 };

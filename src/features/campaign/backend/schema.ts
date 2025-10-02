@@ -66,3 +66,58 @@ export const CampaignTableRowSchema = z.object({
 });
 
 export type CampaignTableRow = z.infer<typeof CampaignTableRowSchema>;
+
+export const CampaignDetailTableRowSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  recruitment_start: z.string(),
+  recruitment_end: z.string(),
+  recruitment_count: z.number(),
+  benefits: z.string(),
+  mission: z.string(),
+  store_info: z.string(),
+  status: z.string(),
+  created_at: z.string(),
+  advertiser_profiles: z.object({
+    id: z.string().uuid(),
+    company_name: z.string(),
+    location: z.string(),
+    category: z.string(),
+    store_phone: z.string(),
+  }),
+});
+
+export type CampaignDetailTableRow = z.infer<
+  typeof CampaignDetailTableRowSchema
+>;
+
+export const CampaignDetailResponseSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  recruitmentStart: z.string(),
+  recruitmentEnd: z.string(),
+  recruitmentCount: z.number().int().positive(),
+  benefits: z.string(),
+  mission: z.string(),
+  storeInfo: z.string(),
+  status: CampaignStatusSchema,
+  category: z.string(),
+  companyName: z.string(),
+  location: z.string(),
+  createdAt: z.string(),
+  daysRemaining: z.number().int().optional(),
+  isDeadlineSoon: z.boolean(),
+  hasApplied: z.boolean(),
+  hasInfluencerProfile: z.boolean(),
+  advertiser: z.object({
+    id: z.string().uuid(),
+    companyName: z.string(),
+    location: z.string(),
+    category: z.string(),
+    storePhone: z.string(),
+  }),
+});
+
+export type CampaignDetailResponse = z.infer<
+  typeof CampaignDetailResponseSchema
+>;

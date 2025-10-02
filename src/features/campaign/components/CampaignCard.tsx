@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Calendar, MapPin, Users } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -30,7 +31,8 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
   };
 
   return (
-    <Card className="group cursor-pointer transition-all hover:shadow-lg">
+    <Link href={`/campaigns/${campaign.id}`}>
+      <Card className="group cursor-pointer transition-all hover:shadow-lg">
       <div className="relative h-48 w-full overflow-hidden rounded-t-lg bg-slate-100">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -96,5 +98,6 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
         )}
       </CardContent>
     </Card>
+    </Link>
   );
 }
