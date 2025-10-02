@@ -8,6 +8,7 @@ import { registerSignupRoutes } from '@/features/auth/backend/signup/route';
 import { registerInfluencerRoutes } from '@/features/influencer/backend/route';
 import { registerAdvertiserRoutes } from '@/features/advertiser/backend/route';
 import { registerCampaignRoutes } from '@/features/campaign/backend/route';
+import { registerApplicationRoutes } from '@/features/application/backend/route';
 import type { AppEnv } from '@/backend/hono/context';
 
 let singletonApp: Hono<AppEnv> | null = null;
@@ -29,6 +30,7 @@ export const createHonoApp = () => {
   registerInfluencerRoutes(app);
   registerAdvertiserRoutes(app);
   registerCampaignRoutes(app);
+  registerApplicationRoutes(app);
 
   singletonApp = app;
 

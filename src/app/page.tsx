@@ -55,12 +55,20 @@ export default function Home() {
           <span className="truncate text-slate-700 dark:text-slate-300">{user.email ?? "알 수 없는 사용자"}</span>
           <div className="flex items-center gap-2">
             {userRole === "influencer" && (
-              <Link
-                href="/onboarding/influencer"
-                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-              >
-                채널 관리
-              </Link>
+              <>
+                <Link
+                  href="/my/applications"
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1 text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  내 지원 목록
+                </Link>
+                <Link
+                  href="/onboarding/influencer"
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1 text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  채널 관리
+                </Link>
+              </>
             )}
             {userRole === "advertiser" && (
               <Link
