@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Home } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AdvertiserCampaignList } from '@/features/campaign/components/AdvertiserCampaignList';
 import { CreateCampaignDialog } from '@/features/campaign/components/CreateCampaignDialog';
@@ -13,6 +14,12 @@ export default function AdvertiserCampaignsPage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex items-center justify-between">
         <div>
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="mb-4">
+              <Home className="mr-2 h-4 w-4" />
+              홈으로
+            </Button>
+          </Link>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
             체험단 관리
           </h1>

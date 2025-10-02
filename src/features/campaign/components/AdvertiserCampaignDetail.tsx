@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -63,6 +65,13 @@ export const AdvertiserCampaignDetail = ({ campaignId }: Props) => {
   return (
     <>
       <div className="space-y-8">
+        <Link href="/advertiser/campaigns">
+          <Button variant="ghost" size="sm" className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            목록으로
+          </Button>
+        </Link>
+
         <div className="flex items-start justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
