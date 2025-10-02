@@ -19,7 +19,8 @@ import { BUSINESS_CATEGORY_OPTIONS } from '@/constants/business-categories';
 import {
   handleBusinessNumberInput,
   parseBusinessNumber,
-  isValidBusinessNumber
+  isValidBusinessNumber,
+  formatBusinessNumber
 } from '@/lib/validation/business-number';
 import { handleStorePhoneInput } from '@/lib/validation/phone';
 import { useAdvertiserProfile } from '../hooks/useAdvertiserProfile';
@@ -95,7 +96,7 @@ export function AdvertiserProfileForm({ initialData, onSuccess }: AdvertiserProf
           location: initialData.location,
           storePhone: initialData.storePhone,
           category: initialData.category,
-          businessNumber: initialData.businessNumber,
+          businessNumber: formatBusinessNumber(initialData.businessNumber),
           representativeName: initialData.representativeName,
         }
       : undefined,
@@ -109,7 +110,7 @@ export function AdvertiserProfileForm({ initialData, onSuccess }: AdvertiserProf
         location: initialData.location,
         storePhone: initialData.storePhone,
         category: initialData.category,
-        businessNumber: initialData.businessNumber,
+        businessNumber: formatBusinessNumber(initialData.businessNumber),
         representativeName: initialData.representativeName,
       });
     }

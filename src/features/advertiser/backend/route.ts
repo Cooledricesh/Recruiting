@@ -66,6 +66,8 @@ export const registerAdvertiserRoutes = (app: Hono<AppEnv>) => {
     if (!result.ok) {
       const errorResult = result as ErrorResult<string, unknown>;
       logger.error('Failed to fetch advertiser profile', errorResult.error.message);
+    } else {
+      logger.info('Successfully fetched advertiser profile', { userId: user.id, hasData: !!result.data });
     }
 
     return respond(c, result);

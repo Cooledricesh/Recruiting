@@ -8,19 +8,22 @@ import type {
   BusinessNumberDuplicateResponse,
 } from '../lib/dto';
 import { useToast } from '@/hooks/use-toast';
-
-const QUERY_KEY = ['advertiser', 'profile'];
+import { useCurrentUser } from '@/features/auth/hooks/useCurrentUser';
 
 export function useAdvertiserProfile() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useCurrentUser();
+
+  const QUERY_KEY = ['advertiser', 'profile', user?.id];
 
   const profileQuery = useQuery<ProfileResponse | null>({
     queryKey: QUERY_KEY,
+    enabled: !!user,
     queryFn: async () => {
       try {
-        const { data } = await apiClient.get('/api/advertiser/profile');
-        return data as ProfileResponse;
+        const response = await apiClient.get('/advertiser/profile');
+        return response.data as ProfileResponse;
       } catch (error: any) {
         if (error.response?.status === 404) {
           return null;
@@ -38,8 +41,8 @@ export function useAdvertiserProfile() {
     CreateProfileRequest
   >({
     mutationFn: async (request) => {
-      const { data } = await apiClient.post('/api/advertiser/profile', request);
-      return data as ProfileResponse;
+      const response = await apiClient.post('/advertiser/profile', request);
+      return response.data as ProfileResponse;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -63,12 +66,12 @@ export function useAdvertiserProfile() {
     excludeUserId?: string
   ): Promise<boolean> => {
     try {
-      const url = `/api/advertiser/business-number/${businessNumber}/duplicate${
+      const url = `/advertiser/business-number/${businessNumber}/duplicate${
         excludeUserId ? `?excludeUserId=${excludeUserId}` : ''
       }`;
-      const { data } = await apiClient.get(url);
-      const response = data as BusinessNumberDuplicateResponse;
-      return response.isDuplicate;
+      const response = await apiClient.get(url);
+      const duplicateResponse = response.data as BusinessNumberDuplicateResponse;
+      return duplicateResponse.isDuplicate;
     } catch (error) {
       return false;
     }

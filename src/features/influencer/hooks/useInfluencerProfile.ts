@@ -8,20 +8,23 @@ import type {
   Channel,
 } from '../lib/dto';
 import { useToast } from '@/hooks/use-toast';
-
-const QUERY_KEY = ['influencer', 'profile'];
+import { useCurrentUser } from '@/features/auth/hooks/useCurrentUser';
 
 export function useInfluencerProfile() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useCurrentUser();
+
+  const QUERY_KEY = ['influencer', 'profile', user?.id];
 
   // 프로필 조회
   const profileQuery = useQuery<ProfileResponse | null>({
     queryKey: QUERY_KEY,
+    enabled: !!user,
     queryFn: async () => {
       try {
-        const { data } = await apiClient.get('/api/influencer/profile');
-        return data as ProfileResponse;
+        const response = await apiClient.get('/influencer/profile');
+        return response.data as ProfileResponse;
       } catch (error: any) {
         // 404는 프로필이 없는 정상 케이스
         if (error.response?.status === 404) {
@@ -41,8 +44,8 @@ export function useInfluencerProfile() {
     CreateProfileRequest
   >({
     mutationFn: async (request) => {
-      const { data } = await apiClient.post('/api/influencer/profile', request);
-      return data as ProfileResponse;
+      const response = await apiClient.post('/influencer/profile', request);
+      return response.data as ProfileResponse;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -68,10 +71,10 @@ export function useInfluencerProfile() {
     Channel
   >({
     mutationFn: async (channel) => {
-      const { data } = await apiClient.post('/api/influencer/channels', {
+      const response = await apiClient.post('/influencer/channels', {
         channel,
       });
-      return data as { channelId: string };
+      return response.data as { channelId: string };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -97,10 +100,10 @@ export function useInfluencerProfile() {
     string
   >({
     mutationFn: async (channelId) => {
-      const { data } = await apiClient.delete(
-        `/api/influencer/channels/${channelId}`
+      const response = await apiClient.delete(
+        `/influencer/channels/${channelId}`
       );
-      return data as { success: boolean };
+      return response.data as { success: boolean };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
