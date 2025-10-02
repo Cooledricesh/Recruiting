@@ -6,6 +6,8 @@ export {
   PaginationSchema,
   CampaignStatusSchema,
   CampaignSortSchema,
+  ApplicationRequestSchema,
+  ApplicationResponseSchema,
 } from '@/features/campaign/backend/schema';
 
 export type {
@@ -14,4 +16,6 @@ export type {
   CampaignListResponse,
   CampaignDetailResponse,
   Pagination,
+  ApplicationRequest,
+  ApplicationResponse,
 } from '@/features/campaign/backend/schema';

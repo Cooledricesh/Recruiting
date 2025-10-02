@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isFutureDate } from '@/lib/validation-utils';
 
 export const CampaignStatusSchema = z.enum(['recruiting', 'closed', 'selected']);
 export const CampaignSortSchema = z.enum(['latest', 'deadline']);
@@ -121,3 +122,30 @@ export const CampaignDetailResponseSchema = z.object({
 export type CampaignDetailResponse = z.infer<
   typeof CampaignDetailResponseSchema
 >;
+
+// Application schemas
+export const ApplicationRequestSchema = z.object({
+  message: z
+    .string()
+    .min(10, '각오 한마디는 최소 10자 이상 입력해야 합니다')
+    .max(500, '각오 한마디는 최대 500자까지 입력 가능합니다'),
+  visitDate: z
+    .string()
+    .refine((date) => isFutureDate(date), {
+      message: '방문 예정일은 오늘 이후 날짜만 선택 가능합니다',
+    }),
+});
+
+export type ApplicationRequest = z.infer<typeof ApplicationRequestSchema>;
+
+export const ApplicationResponseSchema = z.object({
+  id: z.string().uuid(),
+  campaignId: z.string().uuid(),
+  influencerId: z.string().uuid(),
+  message: z.string(),
+  visitDate: z.string(),
+  status: z.literal('applied'),
+  createdAt: z.string(),
+});
+
+export type ApplicationResponse = z.infer<typeof ApplicationResponseSchema>;

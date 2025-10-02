@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { canApply, isRecruitmentClosed } from "@/lib/campaign-utils";
 import type { CampaignStatus } from "@/features/campaign/constants/campaign-status";
+import { CampaignApplyForm } from "./CampaignApplyForm";
 
 type CampaignApplyButtonProps = {
   campaignId: string;
@@ -21,6 +23,8 @@ export function CampaignApplyButton({
   hasApplied,
   hasInfluencerProfile,
 }: CampaignApplyButtonProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   const isApplicable = canApply(
     recruitmentStart,
     recruitmentEnd,
@@ -73,21 +77,31 @@ export function CampaignApplyButton({
   const buttonProps = getButtonContent();
 
   const handleClick = () => {
-    // TODO: 지원 폼으로 이동
-    console.log("Apply to campaign:", campaignId);
+    if (isApplicable && !buttonProps.disabled) {
+      setIsDialogOpen(true);
+    }
   };
 
   return (
-    <div className="sticky bottom-0 border-t bg-white p-4 dark:bg-slate-950">
-      <Button
-        onClick={handleClick}
-        disabled={buttonProps.disabled}
-        variant={buttonProps.variant}
-        size="lg"
-        className="w-full"
-      >
-        {buttonProps.text}
-      </Button>
-    </div>
+    <>
+      <div className="sticky bottom-0 border-t bg-white p-4 dark:bg-slate-950">
+        <Button
+          onClick={handleClick}
+          disabled={buttonProps.disabled}
+          variant={buttonProps.variant}
+          size="lg"
+          className="w-full"
+        >
+          {buttonProps.text}
+        </Button>
+      </div>
+
+      <CampaignApplyForm
+        campaignId={campaignId}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        recruitmentEnd={recruitmentEnd}
+      />
+    </>
   );
 }

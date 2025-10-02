@@ -8,6 +8,7 @@ import {
   calculateDaysRemaining,
   isDeadlineSoon,
 } from '@/lib/date-utils';
+import { isAfterDate, isFutureDate } from '@/lib/validation-utils';
 import { calculateOffset, calculatePagination } from '@/lib/pagination';
 import {
   CampaignListResponseSchema,
@@ -15,12 +16,15 @@ import {
   CampaignTableRowSchema,
   CampaignDetailTableRowSchema,
   CampaignDetailResponseSchema,
+  ApplicationResponseSchema,
   type CampaignListQuery,
   type CampaignListResponse,
   type CampaignResponse,
   type CampaignTableRow,
   type CampaignDetailTableRow,
   type CampaignDetailResponse,
+  type ApplicationRequest,
+  type ApplicationResponse,
 } from './schema';
 import {
   campaignErrorCodes,
@@ -281,4 +285,151 @@ export const getCampaignDetail = async (
   }
 
   return success(detailParse.data);
+};
+
+export const createApplication = async (
+  client: SupabaseClient,
+  campaignId: string,
+  userId: string,
+  request: ApplicationRequest
+): Promise<
+  HandlerResult<ApplicationResponse, CampaignServiceError, unknown>
+> => {
+  const { message, visitDate } = request;
+
+  // 1. 인플루언서 프로필 조회 및 검증
+  const { data: influencerProfile, error: profileError } = await client
+    .from('influencer_profiles')
+    .select('id, is_verified')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !influencerProfile) {
+    return failure(
+      404,
+      campaignErrorCodes.influencerNotFound,
+      '인플루언서 프로필을 찾을 수 없습니다'
+    );
+  }
+
+  if (!influencerProfile.is_verified) {
+    return failure(
+      403,
+      campaignErrorCodes.influencerNotFound,
+      '인증된 인플루언서만 지원할 수 있습니다'
+    );
+  }
+
+  // 2. 체험단 상태 확인
+  const { data: campaign, error: campaignError } = await client
+    .from(CAMPAIGNS_TABLE)
+    .select('id, status, recruitment_start, recruitment_end')
+    .eq('id', campaignId)
+    .single();
+
+  if (campaignError || !campaign) {
+    return failure(
+      404,
+      campaignErrorCodes.notFound,
+      '체험단을 찾을 수 없습니다'
+    );
+  }
+
+  if (campaign.status !== 'recruiting') {
+    return failure(
+      400,
+      campaignErrorCodes.recruitmentClosed,
+      '모집이 마감되었습니다'
+    );
+  }
+
+  const now = new Date();
+  const recruitmentStart = new Date(campaign.recruitment_start);
+  const recruitmentEnd = new Date(campaign.recruitment_end);
+
+  if (now < recruitmentStart || now > recruitmentEnd) {
+    return failure(
+      400,
+      campaignErrorCodes.recruitmentClosed,
+      '모집 기간이 아닙니다'
+    );
+  }
+
+  // 3. 중복 지원 확인
+  const { data: existingApplication } = await client
+    .from('applications')
+    .select('id')
+    .eq('campaign_id', campaignId)
+    .eq('influencer_id', influencerProfile.id)
+    .single();
+
+  if (existingApplication) {
+    return failure(
+      409,
+      campaignErrorCodes.alreadyApplied,
+      '이미 지원한 체험단입니다'
+    );
+  }
+
+  // 4. 방문 예정일 검증
+  if (!isFutureDate(visitDate)) {
+    return failure(
+      400,
+      campaignErrorCodes.invalidVisitDate,
+      '방문 예정일은 오늘 이후 날짜만 선택 가능합니다'
+    );
+  }
+
+  if (!isAfterDate(visitDate, campaign.recruitment_end)) {
+    return failure(
+      400,
+      campaignErrorCodes.invalidVisitDate,
+      '방문 예정일은 모집 종료일 이후여야 합니다'
+    );
+  }
+
+  // 5. applications 테이블에 INSERT
+  const { data: newApplication, error: insertError } = await client
+    .from('applications')
+    .insert({
+      campaign_id: campaignId,
+      influencer_id: influencerProfile.id,
+      message,
+      visit_date: visitDate,
+      status: 'applied',
+    })
+    .select('id, campaign_id, influencer_id, message, visit_date, status, created_at')
+    .single();
+
+  if (insertError || !newApplication) {
+    return failure(
+      500,
+      campaignErrorCodes.applyFailed,
+      '지원에 실패했습니다'
+    );
+  }
+
+  // 6. 결과 반환
+  const applicationResponse: ApplicationResponse = {
+    id: newApplication.id,
+    campaignId: newApplication.campaign_id,
+    influencerId: newApplication.influencer_id,
+    message: newApplication.message,
+    visitDate: newApplication.visit_date,
+    status: 'applied',
+    createdAt: newApplication.created_at,
+  };
+
+  const responseParse = ApplicationResponseSchema.safeParse(applicationResponse);
+
+  if (!responseParse.success) {
+    return failure(
+      500,
+      campaignErrorCodes.validationError,
+      'Application response failed validation',
+      responseParse.error.format()
+    );
+  }
+
+  return success(responseParse.data, 201);
 };
